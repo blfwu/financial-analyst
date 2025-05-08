@@ -1,6 +1,5 @@
 import pandas as pd
 import rbc_analysis
-import plot_graphs
 
 
 statement_file = input("Enter the name of the statement: ")
@@ -27,6 +26,5 @@ statement_df = statement_df[(statement_df["Transaction Date"] >= start_date) & (
 def select_bank():
     if "RBC" in statement_file:
         rbc_analysis.analyze_transactions(statement_df, start_date, end_date)
-        plot_graphs.plot_graphs(statement_df, start_date, end_date)
 
 select_bank()
