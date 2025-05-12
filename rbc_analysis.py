@@ -9,6 +9,7 @@ def analyze_transactions(statement_df, start_date, end_date):
     flagged_transactions = []
     merchants = {}
     debits = {}
+    credits = {}
 
     for index, row in statement_df.iterrows(): # loops thru all transactions and sums all debits for total spending
 
@@ -36,16 +37,24 @@ def analyze_transactions(statement_df, start_date, end_date):
             merchants[row["Description 2"]]["transactions"][date_str] = []
         merchants[row["Description 2"]]["transactions"][date_str].append(row["CAD$"])
 
-        # Store all transactions from each merchant by date into a dictionary
-
-        if date_str not in debits.keys():
-            debits[date_str] = []
-        if row["CAD$"] < 0:
+        # Store all debits and credits from each merchant by date into a dictionary
+        if row["CAD$"] < 0: # debits
+            if date_str not in debits:
+                debits[date_str] = []
             debits[date_str].append(row["CAD$"])
+        elif row["CAD$"] > 0: # credits
+            if date_str not in credits:
+                credits[date_str] = []
+            credits[date_str].append(row["CAD$"])
+        
 
-    debits = {date: round(sum(amts),2) for (date, amts) in debits.items()}
-    print(merchants.items())
-    # print(debits.items())
+    debit_total = {date: round(sum(amts),2) for (date, amts) in debits.items()}
+    credit_total = {date: round(sum(amts),2) for (date, amts) in credits.items()}
+
+
+    # print(merchants.items())
+    print(debit_total)
+    # print(credits.items())
 
 
     total_spent = round(total_spent, 2)
@@ -64,8 +73,8 @@ def analyze_transactions(statement_df, start_date, end_date):
     print(f"The following transactions were flagged for being over $50:")
 
     for index in flagged_transactions:
-        transaction = statement_df.iloc[index]
+        transaction = statement_df.loc[index]
         print(f"Excel Index {index + 2} {transaction["Transaction Date"].date()}: {transaction["Description 1"]} from {transaction["Description 2"]} for ${-transaction["CAD$"]}")
 
     # Plot graphs
-    plot_graphs.plot_graphs(statement_df, start_date, end_date, debits)
+    plot_graphs.plot_graphs(statement_df, start_date, end_date, debit_total, credit_total)
