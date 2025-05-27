@@ -1,5 +1,6 @@
 import pandas as pd
 import plot_graphs
+import json
 
 
 def analyze_transactions(statement_df, start_date, end_date):
@@ -48,13 +49,8 @@ def analyze_transactions(statement_df, start_date, end_date):
             credits[date_str].append(row["CAD$"])
         
 
-    debit_total = {date: round(sum(amts),2) for (date, amts) in debits.items()}
-    credit_total = {date: round(sum(amts),2) for (date, amts) in credits.items()}
-
-
-    # print(merchants.items())
-    print(debit_total)
-    # print(credits.items())
+    debit_total = {date: round(sum(amts),2) for (date, amts) in debits.items()} # sum all debits for each date in dict
+    credit_total = {date: round(sum(amts),2) for (date, amts) in credits.items()} # sum all credits for each date in dict
 
 
     total_spent = round(total_spent, 2)
@@ -62,19 +58,44 @@ def analyze_transactions(statement_df, start_date, end_date):
 
     # SUMMARY ----------------------------------------------------------------------
     print(f"Summary of transactions from {start_date.date()} to {end_date.date()}:")
-
-    # Total spending in period
-    print(f"Total debits: ${-total_spent}")
-
-    # Total credits in period
-    print(f"Total credits: ${total_credits}\n")
-
-    # Flagged transactions
-    print(f"The following transactions were flagged for being over $50:")
+    print(f"Total debits: ${-total_spent}") # Total spending in period
+    print(f"Total credits: ${total_credits}\n") # Total credits in period
+    print(f"The following transactions were flagged for being over $50:") # Flagged transactions
 
     for index in flagged_transactions:
         transaction = statement_df.loc[index]
-        print(f"Excel Index {index + 2} {transaction["Transaction Date"].date()}: {transaction["Description 1"]} from {transaction["Description 2"]} for ${-transaction["CAD$"]}")
+        print(f"CSV Index {index + 2} {transaction["Transaction Date"].date()}: {transaction["Description 1"]} from {transaction["Description 2"]} for ${-transaction["CAD$"]}")
+        # the dataframe index is 2 behind the number on the CSV, so we add 2 to it to get the correct index in the CSV statement
 
-    # Plot graphs
+    # PLOT GRAPHS ------------------------------------------------------------------
     plot_graphs.plot_graphs(statement_df, start_date, end_date, debit_total, credit_total)
+
+
+    # FILTER TRANSACTIONS ----------------------------------------------------------
+    filter_start_date = input("Enter a start date to filter transactions (YYYY-MM-DD) or press 'Enter' to skip: ")
+
+    save_merchant_data(merchants)
+    filter_transactions(start_date = filter_start_date)
+
+
+
+# SAVING MERCHANT DATA TO "merchants.json" FILE ----------------------------------------------------
+
+def save_merchant_data(merchant_data):
+    with open("merchants.json", "w") as file:
+        merchants = json.dump(merchant_data, file, indent=4)
+
+
+
+# FILTERING TRANSACTIONS, MERCHANTS, DATE RANGES, ETC. ---------------------------------------------
+
+def filter_transactions(**kw):
+
+    with open("merchants.json", "r") as file:
+        merchants = json.load(file)
+        
+        if "start_date" in kw:
+            for merchant, merchant_data in merchants.items():
+                for date, amount in merchant_data["transactions"].items():
+                    if kw["start_date"] == date:
+                        print(f"{merchant} on {date} for ${sum(amount)}") # prints the merchant name, date, and total amount for the date inputted
