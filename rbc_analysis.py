@@ -5,28 +5,30 @@ import json
 
 def analyze_transactions(statement_df, start_date, end_date):
 
-    total_spent = 0
-    total_credits = 0
+    total_debits = 0 # per date range/statement period
+    total_credits = 0 # ^
     flagged_transactions = []
     merchants = {}
-    debits = {}
-    credits = {}
+    debits = {} # date: [trans1, trans2...]
+    credits = {} # ^
 
     for index, row in statement_df.iterrows(): # loops thru all transactions and sums all debits for total spending
 
         if row["CAD$"] < 0: # transactions with '-' are debits
-            total_spent += row["CAD$"]
+            total_debits += row["CAD$"]
+        total_debits = round(total_debits, 2)
 
         if row["CAD$"] > 0: # transactions with '+' are credits
             total_credits += row["CAD$"]
+        total_credits = round(total_credits, 2)
 
         if row["CAD$"] < -50 or (row["CAD$"] > -1 and row["CAD$"] < 0): # SHOULD ADD AN OPTION TO CHANGE THE THRESHOLDS FOR FLAGGING!
             flagged_transactions.append(index) # the index is 2 behind the number on the csv
 
-
+    
         # Store all dates and transactions into dictionary for each merchant
-        if row["Description 2"] not in merchants.keys():
-            merchants[row["Description 2"]] = {
+        if row["Description 2"] not in merchants.keys(): # if the merchant name does not exist in the merchant dictionary
+            merchants[row["Description 2"]] = { # create a key in the dict for the merchant
                 # "NAIC_code": 0,
                 # "aliases": [],
                 "transactions": {}
@@ -35,9 +37,10 @@ def analyze_transactions(statement_df, start_date, end_date):
         date_str = row["Transaction Date"].strftime("%Y-%m-%d") # converts date format to YYYY-MM-DD
 
         if date_str not in merchants[row["Description 2"]]["transactions"].keys(): # if the date is not found in the transactions dictionary for that merchant's dict
-            merchants[row["Description 2"]]["transactions"][date_str] = []
-        merchants[row["Description 2"]]["transactions"][date_str].append(row["CAD$"])
+            merchants[row["Description 2"]]["transactions"][date_str] = [] # if a transaction's date for current merchant not found, add it
+        merchants[row["Description 2"]]["transactions"][date_str].append(row["CAD$"]) # add the transaction amount to the list (value for transaction date dict)
 
+        # DEBITS AND CREDITS DICTIONARY FOR SUMMING TOTALS ------------------------------------------------------------------------------------
         # Store all debits and credits from each merchant by date into a dictionary
         if row["CAD$"] < 0: # debits
             if date_str not in debits:
@@ -48,17 +51,13 @@ def analyze_transactions(statement_df, start_date, end_date):
                 credits[date_str] = []
             credits[date_str].append(row["CAD$"])
         
-
-    debit_total = {date: round(sum(amts),2) for (date, amts) in debits.items()} # sum all debits for each date in dict
-    credit_total = {date: round(sum(amts),2) for (date, amts) in credits.items()} # sum all credits for each date in dict
-
-
-    total_spent = round(total_spent, 2)
-    total_credits = round(total_credits, 2)
+    # debits_by_date and credits_by_date are dicts with dates (keys) where there was a transaction(s), then adds the TOTAL debits/credits (value) for that day
+    debits_by_date = {date: round(sum(amts),2) for (date, amts) in debits.items()} # sum all debits for each date in dict
+    credits_by_date = {date: round(sum(amts),2) for (date, amts) in credits.items()} # sum all credits for each date in dict
 
     # SUMMARY ----------------------------------------------------------------------
     print(f"Summary of transactions from {start_date.date()} to {end_date.date()}:")
-    print(f"Total debits: ${-total_spent}") # Total spending in period
+    print(f"Total debits: ${-total_debits}") # Total spending in period
     print(f"Total credits: ${total_credits}\n") # Total credits in period
     print(f"The following transactions were flagged for being over $50:") # Flagged transactions
 
@@ -67,15 +66,12 @@ def analyze_transactions(statement_df, start_date, end_date):
         print(f"CSV Index {index + 2} {transaction["Transaction Date"].date()}: {transaction["Description 1"]} from {transaction["Description 2"]} for ${-transaction["CAD$"]}")
         # the dataframe index is 2 behind the number on the CSV, so we add 2 to it to get the correct index in the CSV statement
 
+
+
     # PLOT GRAPHS ------------------------------------------------------------------
-    plot_graphs.plot_graphs(statement_df, start_date, end_date, debit_total, credit_total)
-
-
-    # FILTER TRANSACTIONS ----------------------------------------------------------
-    filter_start_date = input("Enter a start date to filter transactions (YYYY-MM-DD) or press 'Enter' to skip: ")
+    plot_graphs.plot_graphs(statement_df, start_date, end_date, debits_by_date, credits_by_date)
 
     save_merchant_data(merchants)
-    filter_transactions(start_date = filter_start_date)
 
 
 
@@ -89,13 +85,29 @@ def save_merchant_data(merchant_data):
 
 # FILTERING TRANSACTIONS, MERCHANTS, DATE RANGES, ETC. ---------------------------------------------
 
-def filter_transactions(**kw):
+all_transactions = []
+filtered_list = []
+remove_list = []
 
-    with open("merchants.json", "r") as file:
-        merchants = json.load(file)
-        
-        if "start_date" in kw:
-            for merchant, merchant_data in merchants.items():
-                for date, amount in merchant_data["transactions"].items():
-                    if kw["start_date"] == date:
-                        print(f"{merchant} on {date} for ${sum(amount)}") # prints the merchant name, date, and total amount for the date inputted
+with open("merchants.json", "r") as file:
+    merchants = json.load(file)
+
+    for merchant, merchant_data in merchants.items():
+        for date, amt in merchant_data["transactions"].items():
+            for ea_amt in amt:
+                transaction = (merchant, ea_amt, date)
+            all_transactions.append(transaction)
+    
+    print(all_transactions)
+
+print("Answer the following prompts to filter transactions. Press 'Enter' to skip a filter.")
+filter_merchant = input("Filter by merchant: ")
+filter_min_amt = input("Filter by minimum amount: $")
+filter_max_amt = input("Filter by maximum amount: $")
+filter_min_date = input("Filter by earliest date (YYYY-MM-DD): ")
+filter_max_date = input("Filter by latest date (YYYY-MM-DD): ")
+
+
+# def filter_transactions(merchant, min_amt, max_amt, min_date, max_date):
+    # pass
+# filter_transactions(filter_merchant, filter_min_amt, filter_max_amt, filter_min_date, filter_max_date)
