@@ -1,6 +1,13 @@
 import pandas as pd
 import plot_graphs
 import json
+from datetime import datetime
+
+
+# SAVING MERCHANT DATA TO "merchants.json" FILE ----------------------------------------------------
+def save_merchant_data(merchant_data):
+    with open("merchants.json", "w") as file:
+        merchants = json.dump(merchant_data, file, indent=4)
 
 
 def analyze_transactions(statement_df, start_date, end_date):
@@ -67,7 +74,6 @@ def analyze_transactions(statement_df, start_date, end_date):
         # the dataframe index is 2 behind the number on the CSV, so we add 2 to it to get the correct index in the CSV statement
 
 
-
     # PLOT GRAPHS ------------------------------------------------------------------
     plot_graphs.plot_graphs(statement_df, start_date, end_date, debits_by_date, credits_by_date)
 
@@ -75,39 +81,38 @@ def analyze_transactions(statement_df, start_date, end_date):
 
 
 
-# SAVING MERCHANT DATA TO "merchants.json" FILE ----------------------------------------------------
+def create_transaction_data():
+    # FILTERING TRANSACTIONS, MERCHANTS, DATE RANGES, ETC. ---------------------------------------------
+    all_transactions = []
 
-def save_merchant_data(merchant_data):
-    with open("merchants.json", "w") as file:
-        merchants = json.dump(merchant_data, file, indent=4)
+    with open("merchants.json", "r") as file:
+        merchants = json.load(file)
 
-
-
-# FILTERING TRANSACTIONS, MERCHANTS, DATE RANGES, ETC. ---------------------------------------------
-
-all_transactions = []
-filtered_list = []
-remove_list = []
-
-with open("merchants.json", "r") as file:
-    merchants = json.load(file)
-
-    for merchant, merchant_data in merchants.items():
-        for date, amt in merchant_data["transactions"].items():
-            for ea_amt in amt:
-                transaction = (merchant, ea_amt, date)
-            all_transactions.append(transaction)
+        for merchant, merchant_data in merchants.items():
+            for date, amt in merchant_data["transactions"].items():
+                for ea_amt in amt:
+                    all_transactions.append((merchant, ea_amt, date)) # add all transactions as tuples in all_transactions list
     
-    print(all_transactions)
-
-print("Answer the following prompts to filter transactions. Press 'Enter' to skip a filter.")
-filter_merchant = input("Filter by merchant: ")
-filter_min_amt = input("Filter by minimum amount: $")
-filter_max_amt = input("Filter by maximum amount: $")
-filter_min_date = input("Filter by earliest date (YYYY-MM-DD): ")
-filter_max_date = input("Filter by latest date (YYYY-MM-DD): ")
+    return all_transactions
 
 
-# def filter_transactions(merchant, min_amt, max_amt, min_date, max_date):
-    # pass
-# filter_transactions(filter_merchant, filter_min_amt, filter_max_amt, filter_min_date, filter_max_date)
+
+def filter_transactions(all_transactions, merchant, min_amt, max_amt, min_date, max_date):
+    filtered_list = all_transactions
+    # MERCHANT FILTER ---------------------------------------------------
+    if merchant:
+        filtered_list = [trans for trans in filtered_list if merchant.lower() in trans[0].lower()]
+
+    # TRANSACTION AMT FILTER --------------------------------------------
+    if min_amt:
+        filtered_list = [trans for trans in filtered_list if abs(trans[1]) >= float(min_amt)]
+    if max_amt:
+        filtered_list = [trans for trans in filtered_list if abs(trans[1]) <= float(max_amt)]
+    
+    # DATE FILTER -------------------------------------------------------
+    if min_date:
+        filtered_list = [trans for trans in filtered_list if datetime.strptime(trans[2], "%Y-%m-%d") >= min_date]
+    if max_date:
+        filtered_list = [trans for trans in filtered_list if datetime.strptime(trans[2], "%Y-%m-%d") <= max_date]
+
+    print(f"The filtered list is: {filtered_list}\n")
