@@ -70,7 +70,7 @@ def analyze_transactions(statement_df, start_date, end_date):
 
     for index in flagged_transactions:
         transaction = statement_df.loc[index]
-        print(f"CSV Index {index + 2} {transaction["Transaction Date"].date()}: {transaction["Description 1"]} from {transaction["Description 2"]} for ${-transaction["CAD$"]}")
+        print(f"CSV Index {index + 2} {transaction['Transaction Date'].date()}: {transaction['Description 1']} from {transaction['Description 2']} for ${-transaction['CAD$']}")
         # the dataframe index is 2 behind the number on the CSV, so we add 2 to it to get the correct index in the CSV statement
 
 

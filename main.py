@@ -7,18 +7,29 @@ statement_file = input("Enter the name of the statement: ")
 
 statement_df = pd.read_csv(statement_file)
 
-mode = input("Type 'C' for custom date range or press 'Enter' to analyze the entire statement: ")
+print("Enter a custom statement range or press 'Enter' to use the end ranges.")
 
-if mode == "C":
-    start_date = input("Start date: ")
-    end_date = input("End date: ")
-else:
-    start_date = statement_df.iloc[0]["Transaction Date"]
-    end_date = statement_df.iloc[-1]["Transaction Date"]
+try: # Validate start date input
+    start_date = input("Start date (YYYY-MM-DD): ")
+    datetime.strptime(start_date, '%Y-%m-%d')
+    print(f"Start date {start_date} is valid.")
+except: # Default to earliest day in statement if invalid entry
+    earliest_date = statement_df.iloc[0]["Transaction Date"]
+    print(f"Invalid end date {start_date} detected; using earliest date {earliest_date} from statement.")
+    start_date = earliest_date
+
+try: # Validate end date input
+    end_date = input("End date (YYYY-MM-DD): ")
+    datetime.strptime(end_date, '%Y-%m-%d')
+    print(f"End date {end_date} is valid.")
+except: # Default to last day in statement if invalid entry
+    last_date = statement_df.iloc[-1]["Transaction Date"]
+    print(f"Invalid end date {end_date} detected; using last date {last_date} on statement.")
+    end_date = last_date
+
 
 start_date = pd.to_datetime(start_date)
 end_date = pd.to_datetime(end_date)
-
 
 statement_df["Transaction Date"] = pd.to_datetime(statement_df["Transaction Date"]) # convert 'Transaction Date' column in csv to datetime format
 statement_df = statement_df[(statement_df["Transaction Date"] >= start_date) & (statement_df["Transaction Date"] <= end_date)] # create new df with rows between start and end date
@@ -33,7 +44,7 @@ def select_bank():
 
         # Ask user if want to filter
         while True:
-            use_filter = input("Would you like to filter transactions? (Y/N) ")
+            use_filter = input("\nWould you like to filter transactions? (Y/N) ")
             if use_filter == "Y":
                 print("Answer the following prompts to filter transactions. Press 'Enter' to skip a filter.\n")
                 filter_merchant = input("Filter by merchant: ")
