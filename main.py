@@ -38,9 +38,10 @@ statement_df = statement_df[(statement_df["Transaction Date"] >= start_date) & (
 def select_bank():
     if "RBC" in statement_file:
         rbc_analysis.analyze_transactions(statement_df, start_date, end_date)
+        rbc_analysis.transactions_to_json(statement_df)
 
         # Save transactions (merchant, amt, date) to all_transactions list
-        all_transactions = rbc_analysis.create_transaction_data()
+        all_transactions = rbc_analysis.create_filtered_tuples()
 
         # Ask user if want to filter
         while True:
