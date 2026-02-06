@@ -33,7 +33,9 @@ end_date = pd.to_datetime(end_date)
 
 statement_df["Transaction Date"] = pd.to_datetime(statement_df["Transaction Date"]) # convert 'Transaction Date' column in csv to datetime format
 statement_df = statement_df[(statement_df["Transaction Date"] >= start_date) & (statement_df["Transaction Date"] <= end_date)] # create new df with rows between start and end date
-
+statement_df[["Description 1", "Description 2"]] = statement_df["Description 1"].str.split(" - ", expand=True, n=1) # split "Description 1" column at the " - ": 1st half remains in "Description 1", 2nd half goes in "Description 2"
+statement_df["Description 2"] = statement_df["Description 2"].str[5:]
+# print(f"Description 1: {statement_df['Description 1']} and Description 2: {statement_df['Description 2']}")
 
 def select_bank():
     if "RBC" in statement_file:

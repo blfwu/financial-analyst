@@ -21,26 +21,18 @@ def categorize_merchants(merchant_name, provinces, cities):
 
     filler_words = ["THE", "OF", "LTD", "STORE"]
 
-
-    # if merchant is not a string, skip to next merchant
-    if not isinstance(merchant_name, str):
-        # return N/A for NAIC category
-        return "N/A"
+    if not isinstance(merchant_name, str): # if merchant is not a string, skip to next merchant
+        return "N/A" # return N/A for NAIC category
 
     # turn merchant all uppercase, replace non-letters with space, get rid of whitespace
     clean_name = re.sub(r"[^A-Z\s'-]", ' ', merchant_name.upper()).strip()
 
-    # insert each word in clean_name as an element of split_name list; do not add word if only 1 character (ex. '-')
+    # insert each word from clean_name as an element of split_name list; do not add word if only 1 character (ex. '-')
     split_name = [word for word in clean_name.split() if word and word not in filler_words and len(word) > 1]
 
-    # if split_name is empty, skip to next merchant
-    if not split_name:
-        print(f"No words found for {merchant_name}")
-        
+    if not split_name: # if split_name is empty, skip to next merchant
         return "N/A"
-
-    print(f"Original name: {merchant_name} vs. cleaned name: {', '.join(split_name)}\n")
-
+    
 
     # build parameterized SQL per-merchant; try stricter AND-match first, then OR-match. =========================================
 
@@ -180,14 +172,15 @@ def categorize_merchants(merchant_name, provinces, cities):
 
     if row is not None:
         # return the NAIC category
+        # print(f"{merchant_name} NAIC code is {row[0]}")
         return row[0] 
     else:
         # Attempt B: any word present (OR between pair_clauses) if no rows found
-        print("No direct match found. Trying any word...")
         cursor.execute(any_query, full_params)
         row = cursor.fetchone()
         if row is not None:
             # return the NAIC category
+            # print(f"{merchant_name} NAIC code is {row[0]}")
             return row[0]
     
     conn.close()
@@ -207,37 +200,79 @@ def transactions_to_json(statement_df):
     """
     
     merchants = {}
+    merchant_categories = []
+
+    """
+    TRANSACTION CATEGORIES:
+        'CONTACTLESS INTERAC PURCHASE',
+        'CONTACTLESS INTERAC REFUND',
+        'INTERAC PURCHASE',
+        'VISA DEBIT PURCHASE',
+        'VISA DEBIT REFUND'
+    """
+
+    other_categories = [
+        'ONLINE BANKING TRANSFER',
+        'E-TRANSFER SENT',
+        'ATM TRANSFER TO DEPOSIT ACCT',
+        'ATM DEPOSIT',
+        'E-TRANSFER',
+        'INSURANCE CPL:',
+        'PAYROLL DEPOSIT',
+        'ONLINE TRANSFER TO DEPOSIT ACCOUNT',
+        'MISC PAYMENT MFRP'
+    ]
+    
+    # Add each other_category type to merchants dictionary
+    for cat in other_categories:
+        merchants[cat] = {
+            "category": cat,
+            "transactions": {}
+        }
 
     # Location of purchases
     provinces = input("\nProvince (separate with ', ' if multiple): ").strip()
     cities = input("City (separate with ', ' if multiple): ").strip()
 
     for index, row in statement_df.iterrows(): # loops thru all transactions and sums all debits for total spending
+        naic_set = False
+        desc_1 = row.get("Description 1")
+        desc_2 = row.get("Description 2")
+        merchant_name = desc_2 if isinstance(desc_2, str) else desc_1 # if Description 2 does not exist on the dataframe, set to Description 1
 
-        # Store all dates and transactions into dictionary for each merchant. Create merchant if DNE.
-        if row["Description 2"] not in merchants.keys(): # if the merchant name does not exist in the merchant dictionary
-            merchants[row["Description 2"]] = { # create a key in the dict for the merchant
-                "category": '',
-                "transactions": {}
-            }
-
-        merchant_name = row["Description 2"]
+        merchants.setdefault(merchant_name, {"category": "", "transactions": {}}) # {"[merchant_name]": "category: "", "transactions": {}}
 
         # converts date format to YYYY-MM-DD
         date_str = row["Transaction Date"].strftime("%Y-%m-%d") 
 
-        if date_str not in merchants[row["Description 2"]]["transactions"].keys(): # if the date is not found in the transactions dictionary for that merchant's dict
-            merchants[row["Description 2"]]["transactions"][date_str] = [] # if a transaction's date for current merchant not found, add it
-        merchants[row["Description 2"]]["transactions"][date_str].append(row["CAD$"]) # add the transaction amount to the list (value for transaction date dict)
+        trans = merchants[merchant_name].get("transactions") # get the value of transactions ({})
+        if date_str not in trans:
+            trans[date_str] = []
+        trans[date_str].append(row["CAD$"])
 
-        # Retrieve the merchant's naic category
-        naic_category = categorize_merchants(merchant_name, provinces, cities)
-        merchants[merchant_name]["category"] = naic_category
+        # Retrieve the merchant's naic category if category NOT in other_categories
+        for i in other_categories:
+            if i in row["Description 1"]: # if Description 1 has an other_category, set that as the category
+                naic_category = i # set the NAIC category to the match from other_categories
+                naic_set = True
+                break
+        if not naic_set: # if trans is not part of other_categories, find NAIC code from merchant name
+            naic_category = categorize_merchants(merchant_name, provinces, cities)
+            merchants[merchant_name]["category"] = naic_category
+        else:
+            merchants[merchant_name]["category"] = naic_category
+                
+        merchant_categories.append(naic_category) # Add the category to a list for the new categorized df column
     
-    
-        # print(f"The merchant is {merchant_name} and the category is {merchant_name['category']}")
-        category = merchants.get(merchant_name, {}).get("category", "N/A")
-        print(f"The merchant is {merchant_name} and the category is {category}\n\n")
+    # print(merchant_categories)
+
+    # Write it to the new dataframe and export to excel
+    updated_statement_df = statement_df.copy()
+    updated_statement_df["Category"] = merchant_categories
+    # print(updated_statement_df)
+
+    updated_statement_df.to_excel("statement.xlsx", index=False)
+    print(f"Successfully wrote dataframe to statement.xlsx\n")
 
 
     # SAVE MERCHANT DATA TO JSON
@@ -316,6 +351,7 @@ def create_filtered_tuples():
         merchants = json.load(file)
 
         for merchant, merchant_data in merchants.items():
+            # print(f"{merchant}: {merchant_data}")
             for date, amt in merchant_data["transactions"].items():
                 for ea_amt in amt:
                     all_transactions.append((merchant, ea_amt, date)) # add all transactions as tuples in all_transactions list
